@@ -1,0 +1,171 @@
+'CR1000X Series
+'Created by Short Cut (4.4)
+
+'Declare Variables and Units
+Public BattV
+Public PTemp_C
+Public SR01Up
+Public SR01Dn
+Public IR01Up
+Public IR01Dn
+Public NR01TC
+Public NR01TK
+Public NetRs
+Public NetRl
+Public Albedo
+Public UpTot
+Public DnTot
+Public NetTot
+Public IR01UpCo
+Public IR01DnCo
+Public TRHData(2)
+Public SR50A(2)
+Public TCDT
+Public DBTCDT
+Public WS_ms
+Public WindDir
+Public CS65X(3)
+Public BaroVUE(3)
+Public Rain_mm
+Public FTPResultData
+Public FTPResultBatery
+
+
+Alias TRHData(1)=AirTC
+Alias TRHData(2)=RH
+Alias SR50A(1)=DT
+Alias SR50A(2)=Q
+Alias CS65X(1)=VWC
+Alias CS65X(2)=EC
+Alias CS65X(3)=T
+Alias BaroVUE(1)=BV_BP
+Alias BaroVUE(2)=BV_Temp
+Alias BaroVUE(3)=BV_Qual
+
+Units BattV=Volts
+Units PTemp_C=Deg C
+Units SR01Up=W/m^2
+Units SR01Dn=W/m^2
+Units IR01Up=W/m^2
+Units IR01Dn=W/m^2
+Units NR01TC=Deg C
+Units NR01TK=K
+Units NetRs=W/m^2
+Units NetRl=W/m^2
+Units Albedo=W/m^2
+Units UpTot=W/m^2
+Units DnTot=W/m^2
+Units NetTot=W/m^2
+Units IR01UpCo=W/m^2
+Units IR01DnCo=W/m^2
+Units WS_ms=meters/second
+Units WindDir=degrees
+Units Rain_mm=mm
+Units AirTC=Deg C
+Units RH=%
+Units VWC=m^3/m^3
+Units EC=dS/m
+Units T=Deg C
+Units BV_BP=hPa
+Units BV_Temp=deg C
+Units BV_Qual=unitless
+
+'Define Data Tables
+DataTable(Table1,True,-1)
+	DataInterval(0,10,Min,10)
+	Average(1,SR01Up,FP2,False)
+	Average(1,SR01Dn,FP2,False)
+	Average(1,IR01Dn,FP2,False)
+	Average(1,NR01TC,FP2,False)
+	Average(1,NetRs,FP2,False)
+	Average(1,NetRl,FP2,False)
+	Average(1,UpTot,FP2,False)
+	Average(1,DnTot,FP2,False)
+	Average(1,NetTot,FP2,False)
+	Average(1,AirTC,FP2,False)
+	Sample(1,RH,FP2)
+	Average(1,DBTCDT,FP2,False)
+	Sample(1,DBTCDT,FP2)
+	Average(1,WS_ms,FP2,False)
+	Maximum(1,WS_ms,FP2,False,True)
+	WindVector(1,WS_ms,WindDir,FP2,False,0,0,3)
+	FieldNames("WindDir_D1_WVT")
+	Average(1,VWC,FP2,False)
+	Average(1,EC,FP2,False)
+	Average(1,T,FP2,False)
+	Average(1,BV_BP,IEEE4,False)
+	Average(1,BV_Temp,FP2,False)
+	Minimum(1,BV_Qual,FP2,False,False)
+	Totalize(1,Rain_mm,FP2,False)
+EndTable
+
+DataTable(Table2,True,-1)
+	DataInterval(0,1,hr,10)
+	Minimum(1,BattV,FP2,False,False)
+EndTable
+
+'Main Program
+BeginProg
+	'Main Scan
+	Scan(1,Min,1,0)
+		'Default CR1000X Datalogger Battery Voltage measurement 'BattV'
+		Battery(BattV)
+		'Default CR1000X Datalogger Wiring Panel Temperature measurement 'PTemp_C'
+		PanelTemp(PTemp_C,50)
+		
+    'Turn PSW12 Power Switch (CSL) On pour chauffage NR01 a faie le 23/10/2023
+		'PortSet(C1,1)
+		'Delay(0,2,Sec)
+		'NR01 Net Radiometer measurements 'SR01Up', 'SR01Dn', 'IR01Up', 'IR01Dn', 'NR01TC', 'NR01TK',
+		'NetRs', 'NetRl', 'Albedo', 'UpTot', 'DnTot', 'NetTot', 'IR01UpCo', and 'IR01DnCo'
+		VoltDiff(SR01Up,1,autorange,1,True,0,50,62.53909,0)
+		VoltDiff(SR01Dn,1,autorange,2,True,0,50,66.0502,0)
+		VoltDiff(IR01Up,1,mV200,3,True,0,50,99.30487,0)
+		VoltDiff(IR01Dn,1,mV200,4,True,0,50,139.8601,0)
+		BrHalf4W(NR01TC,1,mV200,mV200,5,VX1,1,4000,True,True,0,50,1,0)
+		PRT(NR01TC,1,NR01TC,1,0)
+		NR01TK=NR01TC+273.15
+		NetRs=SR01Up-SR01Dn
+		NetRl=IR01Up-IR01Dn
+		Albedo=SR01Dn/SR01Up
+		UpTot=SR01Up+IR01Up
+		DnTot=SR01Dn+IR01Dn
+		NetTot=UpTot-DnTot
+		IR01UpCo=IR01Up+5.67*10^-8*NR01TK^4
+		IR01DnCo=IR01Dn+5.67*10^-8*NR01TK^4
+		'HygroVUE5/HygroVUE10 Digital Temperature & Relative Humidity Sensor measurements 'AirTC' and 'RH'
+		SDI12Recorder(TRHData(),C1,"0","M!",1,0,-1)
+		'SR50A/SR50A-EE Sonic Ranging Sensor (SDI-12 Output) measurements 'DT' and 'Q' and calculations 'TCDT' and 'DBTCDT'
+		SDI12Recorder(SR50A(),C3,"0","M1!",1,0,-1)
+		TCDT=DT*SQR((AirTC+273.15)/273.15)
+		DBTCDT=3-TCDT
+		SubScan(1,Sec,1)
+  		'05106 Wind Speed & Direction Sensor measurements 'WS_ms' and 'WindDir'
+  		PulseCount(WS_ms,1,P1,5,1,0.098,0)
+  		BrHalf(WindDir,1,mV5000,13,VX1,1,2500,True,20000,50,355,0)
+  		If WindDir>=355 OR WindDir<0 Then WindDir=0
+		NextSubScan
+		'CS650/CS655 Water Content Reflectometer measurements 'VWC', 'EC', and 'T'
+		'If TimeIntoInterval(0,1,Hr) Then
+			SDI12Recorder(CS65X(),C5,"0","M!",1,0,-1)
+		'EndIf
+		'If TimeIntoInterval(0,60,Min) Then
+			'BaroVUE10 (SDI-12) Barometric Pressure Sensor measurements 'BV_BP', 'BV_Temp', and 'BV_Qual'
+			SDI12Recorder(BaroVUE(),C7,"0","M!",1,0,-1)
+			'Correct BaroVUE10 (SDI-12) Barometric Pressure Sensor 'BV_BP' measurement from station pressure to sea level pressure
+			BV_BP=BV_BP+1013.25*(1-(1-1520/44307.69231)^5.25328)
+		'EndIf
+		'Generic Tipping Bucket Rain Gauge measurement 'Rain_mm'
+		PulseCount(Rain_mm,1,P2,1,0,2.54,0)
+		'Call Data Tables and Store Data
+		CallTable Table1
+		CallTable Table2
+	NextScan
+	
+  SlowSequence
+  Scan(10,Min, 3,0)
+    FTPResultData=FTPClient("ftp_adress:21", "user", "pass", "Table1", "station_meteo_lauvitel/data_prod.csv", 19, 0, 0, Min, -1008)
+    FTPResultBatery=FTPClient("ftp_adress:21", "user", "pass", "Table2", "station_meteo_lauvitel/batery_prod.csv", 19, 0, 0, Min, -1008)
+  NextScan
+
+EndProg
